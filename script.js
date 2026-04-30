@@ -224,7 +224,82 @@ function exportCSV() {
     a.download = `MileTrack_${businessName.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
 }
+// ... (keep all previous code: trips, businessName, haversine, startTracking, stopTracking, etc.)
 
+function backupNow() {
+    if (!trips.length) {
+        alert("No trips to backup yet!");
+        return;
+    }
+    exportCSV(); // Uses the existing export
+
+    setTimeout(() => {
+        alert(`✅ Backup file downloaded!\n\n` +
+              `💡 How to save safely:\n` +
+              `1. Open Downloads folder\n` +
+              `2. Tap the MileTrack_...csv file\n` +
+              `3. Choose "Save to Google Drive" or "Files"\n\n` +
+              `Do this regularly for safety!`);
+    }, 800);
+}
+
+function importCSV(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const rows = text.split('\n');
+        let imported = 0;
+
+        // Skip header row
+        for (let i = 1; i < rows.length; i++) {
+            if (!rows[i].trim()) continue;
+            const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Simple CSV parse
+
+            if (cols.length >= 4) {
+                const newTrip = {
+                    date: cols[0].trim(),
+                    startTime: cols[1].trim(),
+                    endTime: cols[2].trim(),
+                    miles: parseFloat(cols[3]) || 0,
+                    purpose: cols[4] ? cols[4].replace(/"/g, '').trim() : 'Imported trip',
+                    gpsMiles: parseFloat(cols[5]) || 0,
+                    manualOdometer: cols[6] ? {start: cols[6], end: ''} : null
+                };
+                trips.push(newTrip);
+                imported++;
+            }
+        }
+
+        if (imported > 0) {
+            saveTrips();
+            alert(`✅ Successfully imported ${imported} trips!`);
+        } else {
+            alert("❌ No valid trips found in the file.");
+        }
+    };
+    reader.readAsText(file);
+}
+
+// ==================== INITIALIZE ====================
+document.body.classList.toggle('light', isLightMode);
+updateBusinessNameDisplay();
+renderHistory();
+updateTotalMiles();
+
+// First time setup
+if (!localStorage.getItem('miletrack_businessName')) {
+    setTimeout(editBusinessName, 1000);
+}
+
+// Resume draft if any
+if (localStorage.getItem('miletrack_draft')) {
+    if (confirm("Resume unfinished trip from last time?")) {
+        alert("Press the big START button to continue.");
+    }
+}
 // ==================== INITIALIZE ====================
 document.body.classList.toggle('light', isLightMode);
 updateBusinessNameDisplay();
