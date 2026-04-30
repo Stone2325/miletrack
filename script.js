@@ -1,168 +1,81 @@
-let trips = JSON.parse(localStorage.getItem('miletrack_trips')) || [];
-let businessName = localStorage.getItem('miletrack_businessName') || "Your Name / Company";
-let isTracking = false;
-let watchId = null;
-let currentPositions = [];
-let startTime = null;
-let lastPosition = null;
-let isLightMode = localStorage.getItem('lightMode') === 'true';
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+    transition: background 0.3s;
+}
+body.light {
+    background: #f8fafc;
+    color: #1e2937;
+}
+.container { background: #1e2937; border-radius: 20px; padding: 20px; transition: background 0.3s; }
+body.light .container { background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
 
-const haversine = (lat1, lon1, lat2, lon2) => {
-    const toRad = x => x * Math.PI / 180;
-    const R = 3958.8;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-};
+header { text-align: center; margin-bottom: 20px; position: relative; cursor: pointer; }
+#businessNameDisplay { font-size: 1.1rem; color: #94a3b8; margin-top: 4px; }
+body.light #businessNameDisplay { color: #475569; }
 
-function saveTrips() {
-    localStorage.setItem('miletrack_trips', JSON.stringify(trips));
-    renderHistory();
-    updateTotalMiles();
+.status { text-align:center; padding:12px; background:#334155; border-radius:12px; margin-bottom:16px; font-weight:600; }
+body.light .status { background:#e2e8f0; color:#1e2937; }
+
+.totals { background:#1e40af; color:white; padding:16px; border-radius:12px; text-align:center; margin-bottom:24px; }
+.summary-btn { margin-top:8px; padding:8px 16px; background:rgba(255,255,255,0.2); border:none; border-radius:8px; color:white; }
+
+.buttons { display:flex; flex-direction:column; gap:16px; margin-bottom:24px; }
+
+.big-btn {
+    padding: 48px 20px;          /* Much taller for easy tap while driving */
+    font-size: 1.8rem;           /* Big text */
+    font-weight: 900;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    width: 100%;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    transition: all 0.2s;
 }
 
-function updateTotalMiles() {
-    const total = trips.reduce((sum, t) => sum + (t.miles || 0), 0).toFixed(1);
-    document.getElementById('totalMiles').textContent = total;
+.start {
+    background: #22c55e;
+    color: #0f172a;
+    animation: pulse 2s infinite;   /* Gentle pulse so you see it immediately */
+}
+.stop {
+    background: #ef4444;
+    color: white;
+    padding: 36px 20px;
+    font-size: 1.6rem;
 }
 
-function renderHistory() {
-    const container = document.getElementById('history');
-    container.innerHTML = trips.length ? '' : '<p style="color:#64748b;text-align:center;">No trips yet</p>';
-    
-    trips.slice().reverse().forEach((trip, idx) => {
-        const realIdx = trips.length - 1 - idx;
-        const div = document.createElement('div');
-        div.className = 'trip';
-        div.innerHTML = `
-            <strong>${trip.date}</strong> • ${trip.miles.toFixed(2)} miles<br>
-            <small>${trip.startTime} – ${trip.endTime}</small><br>
-            <em>${trip.purpose}</em>
-            <button onclick="deleteTrip(${realIdx}); event.stopImmediatePropagation()" style="right:10px;">🗑</button>
-            <button onclick="editTrip(${realIdx}); event.stopImmediatePropagation()" style="right:50px;">✏️</button>
-        `;
-        container.appendChild(div);
-    });
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
 }
 
-function updateBusinessNameDisplay() {
-    document.getElementById('businessNameDisplay').textContent = businessName;
+#currentTrip { background:#334155; padding:16px; border-radius:12px; margin-bottom:24px; }
+body.light #currentTrip { background:#f1f5f9; color:#1e2937; }
+label { display:block; margin:12px 0 6px; font-weight:600; }
+input { width:100%; padding:14px; border-radius:8px; border:none; font-size:1.1rem; }
+
+.trip { background:#334155; padding:14px; border-radius:12px; margin-bottom:12px; position:relative; }
+body.light .trip { background:#f1f5f9; }
+.trip button { position:absolute; right:10px; top:10px; padding:4px 8px; font-size:0.8rem; }
+
+.export-btn, .theme-btn {
+    padding:18px; background:#1e40af; color:white; border:none; border-radius:12px;
+    font-size:1.1rem; font-weight:bold; cursor:pointer;
 }
+.theme-btn { position:absolute; top:16px; right:16px; padding:8px 12px; font-size:1.4rem; }
 
-function editBusinessName() {
-    const newName = prompt("Enter your name or company name (shown on reports):", businessName);
-    if (newName !== null && newName.trim() !== "") {
-        businessName = newName.trim();
-        localStorage.setItem('miletrack_businessName', businessName);
-        updateBusinessNameDisplay();
-    }
+.modal {
+    position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8);
+    display:flex; align-items:center; justify-content:center; z-index:100;
 }
-
-function toggleTheme() {
-    isLightMode = !isLightMode;
-    document.body.classList.toggle('light', isLightMode);
-    localStorage.setItem('lightMode', isLightMode);
+.modal-content {
+    background:#1e2937; padding:24px; border-radius:20px; max-width:90%; width:500px; max-height:80vh; overflow:auto;
 }
-
-// ... (startTracking, stopTracking, deleteTrip, editTrip functions remain the same as previous version) ...
-
-function stopTracking() {
-    if (!isTracking) return;
-    navigator.geolocation.clearWatch(watchId);
-    
-    let gpsMiles = 0;
-    for (let i = 1; i < currentPositions.length; i++) {
-        gpsMiles += haversine(currentPositions[i-1].lat, currentPositions[i-1].lon,
-                             currentPositions[i].lat, currentPositions[i].lon);
-    }
-
-    const manualStart = prompt("Enter starting odometer reading (optional):");
-    const manualEnd = manualStart ? prompt("Enter ending odometer reading:") : null;
-    let finalMiles = gpsMiles;
-    if (manualStart && manualEnd) {
-        finalMiles = parseFloat(manualEnd) - parseFloat(manualStart);
-        if (isNaN(finalMiles) || finalMiles < 0) finalMiles = gpsMiles;
-    }
-
-    const purpose = document.getElementById('purpose').value.trim() || 'No description';
-    const endTime = new Date();
-
-    const newTrip = {
-        date: startTime.toISOString().split('T')[0],
-        startTime: startTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-        endTime: endTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-        miles: finalMiles,
-        purpose: purpose,
-        gpsMiles: gpsMiles,
-        manualOdometer: manualStart ? {start: manualStart, end: manualEnd} : null
-    };
-
-    trips.push(newTrip);
-    localStorage.removeItem('miletrack_draft');
-    saveTrips();
-
-    isTracking = false;
-    currentPositions = [];
-    document.getElementById('startBtn').style.display = 'block';
-    document.getElementById('stopBtn').style.display = 'none';
-    document.getElementById('currentTrip').style.display = 'none';
-    document.getElementById('purpose').value = '';
-    document.getElementById('status').textContent = 'Trip saved ✓';
-    setTimeout(() => document.getElementById('status').textContent = 'Ready to track', 2500);
-}
-
-function showMonthlySummary() {
-    const months = {};
-    trips.forEach(t => {
-        const monthKey = t.date.substring(0,7);
-        if (!months[monthKey]) months[monthKey] = 0;
-        months[monthKey] += t.miles || 0;
-    });
-
-    let html = `<p><strong>Logged by: ${businessName}</strong></p>`;
-    html += `<p><strong>Year Total: ${document.getElementById('totalMiles').textContent} miles</strong></p><ul>`;
-    Object.keys(months).sort().reverse().forEach(m => {
-        html += `<li>${m}: ${months[m].toFixed(1)} miles</li>`;
-    });
-    html += '</ul>';
-    document.getElementById('summaryContent').innerHTML = html;
-    document.getElementById('modalTitle').textContent = `Monthly Summary - ${businessName}`;
-    document.getElementById('modal').style.display = 'flex';
-}
-
-function exportCSV() {
-    if (!trips.length) return alert('No trips yet!');
-    let csv = 'Date,Start Time,End Time,Miles,Purpose,GPS Miles,Manual Odometer,Logged By\n';
-    trips.forEach(t => {
-        const manual = t.manualOdometer ? `${t.manualOdometer.start}-${t.manualOdometer.end}` : '';
-        csv += `${t.date},${t.startTime},${t.endTime},${t.miles.toFixed(2)},${t.purpose.replace(/,/g,' ')},${(t.gpsMiles||0).toFixed(2)},${manual},${businessName.replace(/,/g,' ')}\n`;
-    });
-    const blob = new Blob([csv], {type: 'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `MileTrack_${businessName.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-}
-
-// Initialize everything
-document.body.classList.toggle('light', isLightMode);
-updateBusinessNameDisplay();
-renderHistory();
-updateTotalMiles();
-
-// First-time prompt
-if (!localStorage.getItem('miletrack_businessName')) {
-    setTimeout(() => {
-        editBusinessName();
-    }, 800);
-}
-
-// Draft resume logic (same as before)
-const draftTrip = JSON.parse(localStorage.getItem('miletrack_draft'));
-if (draftTrip) {
-    if (confirm("Resume previous unfinished trip?")) {
-        alert("Press START to continue tracking.");
-    }
-}
+body.light .modal-content { background:white; color:#1e2937; }
