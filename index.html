@@ -37,7 +37,13 @@
         <h2>Trip History</h2>
         <div id="history"></div>
 
-        <button onclick="exportCSV()" class="export-btn">📤 Export Full CSV for IRS</button>
+        <div class="backup-section">
+            <button onclick="backupNow()" class="export-btn">💾 Backup Now (to Drive)</button>
+            <button onclick="document.getElementById('importFile').click()" class="export-btn" style="background:#64748b;margin-top:8px;">
+                📥 Import from Backup
+            </button>
+            <input type="file" id="importFile" accept=".csv" style="display:none;" onchange="importCSV(this)">
+        </div>
     </div>
 
     <!-- Monthly Summary Modal -->
@@ -48,10 +54,6 @@
             <button onclick="closeModal()" class="export-btn">Close</button>
         </div>
     </div>
-
-    <script src="script.js"></script>
-</body>
-</html>
 
     <script src="script.js"></script>
 </body>
