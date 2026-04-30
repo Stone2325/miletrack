@@ -79,3 +79,9 @@ body.light .trip { background:#f1f5f9; }
     background:#1e2937; padding:24px; border-radius:20px; max-width:90%; width:500px; max-height:80vh; overflow:auto;
 }
 body.light .modal-content { background:white; color:#1e2937; }
+.backup-section {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
